@@ -3,15 +3,20 @@ Es una tienda de técnología
 ''' 
 import sqlite3
 import tkinter as tk
+from tkinter import messagebox
 
 #Funciones CRUD
 
-def create(nombre, precio, color, descripcion, stock):
+def create():
 
     nombre = entrada_nombre.get()
     precio = entrada_precio.get()
-    color = entrada_precio.get()
+    color = entrada_color.get()
+    descripcion = entrada_descripcion.get()
+    stock = entrada_stock.get()
 
+    if not nombre or not precio or not color or not descripcion or not stock:
+        return messagebox.showwarning('Cuidadito', "Todos los campos son obligatorios.")
 
     conexion = sqlite3.connect('PCBelenJulio.db')
     cursor = conexion.cursor()
@@ -34,7 +39,13 @@ def create(nombre, precio, color, descripcion, stock):
     conexion.commit()
     conexion.close()
 
-    print(f"Producto {nombre} agregado correctamente.")
+    entrada_nombre.delete(0, tk.END)
+    entrada_precio.delete(0, tk.END)
+    entrada_descripcion.delete(0, tk.END)
+    entrada_color.delete(0, tk.END)
+    entrada_stock.delete(0, tk.END)
+
+    messagebox.showinfo('Éxito', 'Producto insertado correctamente')
 
 
 def read():
@@ -86,7 +97,7 @@ label_stock.grid(row=4, column=0, padx=8, pady=10)
 entrada_stock = tk.Entry(agregar)
 entrada_stock.grid(row=4, column=1, padx=8, pady=10)
 
-agregar_button = tk.Button(agregar, text="Agregar", width=20)
+agregar_button = tk.Button(agregar, text="Agregar", width=20, command=create)
 agregar_button.grid(row=5, column=0, columnspan=2, pady=15, sticky="ns")
 
-ventana.mainloop()
+ventana.mainloop()  
