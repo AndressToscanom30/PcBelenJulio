@@ -18,6 +18,20 @@ def create():
     if not nombre or not precio or not color or not descripcion or not stock:
         return messagebox.showwarning('Cuidadito', "Todos los campos son obligatorios.")
 
+    try:
+        precio = float(precio)
+        if precio <= 0:
+            return messagebox.showwarning('Cuidadito', 'El precio debe ser un número positivo.')
+    except ValueError:
+        return messagebox.showwarning('Cuidadito', 'El precio debe ser un número válido.')    
+
+    try:
+        stock = int(stock)
+        if stock < 0:
+            return messagebox.showwarning('Cuidadito', "El stock debe ser un número entero no negativo.")
+    except ValueError:
+       return messagebox.showwarning('Cuidadito', "El stock debe ser un número entero.")
+
     conexion = sqlite3.connect('PCBelenJulio.db')
     cursor = conexion.cursor()
 
