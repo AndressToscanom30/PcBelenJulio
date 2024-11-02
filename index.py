@@ -46,5 +46,3 @@ def delete():
 #GUI
 
 ventana = tk.Tk()
-
-print("Hello world")
