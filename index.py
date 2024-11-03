@@ -10,342 +10,312 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import sqlite3
 
-def conectar_db(consulta, parametros=None):
-    conexion = sqlite3.connect("inventario_componentes.db")
-    conexion.row_factory = sqlite3.Row
-    cursor = conexion.cursor()
-    if parametros:
-        cursor.execute(consulta, parametros)
-    else:
-        cursor.execute(consulta)
-    conexion.commit()
-    resultado = [dict(fila) for fila in cursor.fetchall()]
-    conexion.close()
-    return resultado
+
+def conectar_db():
+    return sqlite3.connect("inventario_componentes.db")
+
+
+COLORES = {
+    "fondo": "#E3F2FD",
+    "frame_principal": "#FFFFFF",
+    "boton_primario": "#1976D2",
+    "boton_secundario": "#64B5F6",
+    "texto": "#1A237E",
+    "error": "#EF5350",
+}
+
+CAMPOS = {
+    "modelo": {"label": "Modelo", "tipo": str, "required": True},
+    "nombre": {"label": "Nombre", "tipo": str, "required": True},
+    "especificaciones": {"label": "Especificaciones", "tipo": str, "required": True},
+    "precio": {
+        "label": "Precio",
+        "tipo": float,
+        "required": True,
+        "validacion": lambda x: x.replace(".", "", 1).isdigit() if x else False,
+    },
+    "cantidad": {
+        "label": "Cantidad",
+        "tipo": int,
+        "required": True,
+        "validacion": lambda x: x.isdigit() if x else False,
+    },
+}
+
+CATEGORIAS = {
+    "microcontroladores": "Microcontroladores (Arduino, ESP32, PIC)",
+    "pasivos": "Componentes Pasivos (R, C, L)",
+    "activos": "Componentes Activos (Transistores, CI)",
+    "sensores": "Sensores (Temp, Humedad)",
+    "modulos": "Módulos (WiFi, Bluetooth)",
+    "herramientas": "Herramientas",
+    "accesorios": "Accesorios",
+}
 
 
 class SistemaTienda:
     def __init__(self, ventana):
         self.ventana = ventana
-        self.ventana.title("Sistema de Gestión - ELECTROCrossFit")
-        self.ventana.config(bg="#F0F4F8")
-        ancho_ventana = 1600
-        alto_ventana = 800
-        ancho_pantalla = ventana.winfo_screenwidth()
-        alto_pantalla = ventana.winfo_screenheight()
-        x = (ancho_pantalla - ancho_ventana) // 2
-        y = (alto_pantalla - alto_ventana) // 2
-        self.ventana.geometry(f"{ancho_ventana}x{alto_ventana}+{x}+{y}")
-        self.iniciar_interfaz()
-        self.crear_tabla_productos()
+        self.ventana.title("Electrónica Mr.CrossFit - Sistema de Gestión")
+        self.ventana.configure(bg=COLORES["fondo"])
 
-    def crear_tabla_productos(self):
-        consulta = """CREATE TABLE IF NOT EXISTS productos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            modelo TEXT NOT NULL,
-            nombre TEXT NOT NULL,
-            especificaciones TEXT,
-            precio REAL,
-            cantidad INTEGER,
-            categoria TEXT
-        )"""
-        conectar_db(consulta)
+        ancho, alto = 1200, 700
+        x = (ventana.winfo_screenwidth() - ancho) // 2
+        y = (ventana.winfo_screenheight() - alto) // 2
+        self.ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
 
-    def iniciar_interfaz(self):
-        estilo = ttk.Style()
-        estilo.configure("Custom.TEntry", padding=5)
-        estilo.configure("Custom.TButton", padding=10)
-        marco_principal = tk.Frame(self.ventana, bg="#F0F4F8", padx=20, pady=20)
-        marco_principal.pack(fill="both", expand=True)
-        marco_titulo = tk.Frame(marco_principal, bg="#F0F4F8")
-        marco_titulo.pack(fill="x", pady=(0, 20))
-        tk.Label(
-            marco_titulo,
-            text="ELECTROCrossFit - Sistema de Gestión",
-            font=("Helvetica", 24, "bold"),
-            bg="#F0F4F8",
-            fg="#1A365D",
-        ).pack()
-        marco_contenido = tk.Frame(marco_principal, bg="#F0F4F8")
-        marco_contenido.pack(fill="both", expand=True)
-        self.crear_formulario(marco_contenido)
-        self.crear_tabla(marco_contenido)
+        self.crear_db()
+        self.crear_interfaz()
 
-    def crear_formulario(self, padre):
-        marco_form = tk.Frame(padre, bg="white", padx=30, pady=20)
-        marco_form.pack(side="left", fill="both", expand=True, padx=(0, 10))
-        marco_form.config(relief="ridge", bd=1)
-        tk.Label(
-            marco_form,
-            text="Agregar Nuevo Componente",
-            font=("Helvetica", 16, "bold"),
-            bg="white",
-            fg="#2C5282",
-        ).pack(pady=(0, 20))
-        campos = {
-            "Modelo": {"tipo": str},
-            "Nombre": {"tipo": str},
-            "Especificaciones": {"tipo": str},
-            "Precio": {"tipo": float},
-            "Cantidad": {"tipo": int},
-        }
-        self.entradas = {}
-        for nombre, config in campos.items():
-            marco_campo = tk.Frame(marco_form, bg="white")
-            marco_campo.pack(fill="x", pady=5)
-            tk.Label(
-                marco_campo,
-                text=f"{nombre}:",
-                font=("Helvetica", 12),
-                bg="white",
-                width=15,
-                anchor="w",
-            ).pack(side="left")
-            entrada = ttk.Entry(marco_campo, style="Custom.TEntry", width=30)
-            entrada.pack(side="left", padx=(10, 0))
-            self.entradas[nombre] = {"widget": entrada, "tipo": config["tipo"]}
-            if config["tipo"] in [int, float]:
-                entrada.config(validate="key")
-                if config["tipo"] == float:
-                    entrada.config(
-                        validatecommand=(padre.register(self.validar_decimal), "%P")
-                    )
-                else:
-                    entrada.config(
-                        validatecommand=(padre.register(self.validar_entero), "%P")
-                    )
-        marco_categoria = tk.Frame(marco_form, bg="white")
-        marco_categoria.pack(fill="x", pady=5)
-        tk.Label(
-            marco_categoria,
-            text="Categoría:",
-            font=("Helvetica", 12),
-            bg="white",
-            width=15,
-            anchor="w",
-        ).pack(side="left")
-        self.categorias = {
-            "Microcontroladores": {"descripcion": "Arduino, ESP32, PIC, etc."},
-            "Componentes Pasivos": {
-                "descripcion": "Resistencias, capacitores, inductores"
-            },
-            "Componentes Activos": {"descripcion": "Transistores, CI, reguladores"},
-            "Sensores": {"descripcion": "Temperatura, humedad, proximidad"},
-            "Módulos": {"descripcion": "Bluetooth, WiFi, RF, displays"},
-            "Herramientas": {"descripcion": "Cautín, multímetro, pinzas"},
-            "Accesorios": {"descripcion": "Cables, protoboards, baterías"},
-        }
-        self.categoria_var = ttk.Combobox(
-            marco_categoria,
-            values=list(self.categorias.keys()),
-            width=27,
-            state="readonly",
-        )
-        self.categoria_var.pack(side="left", padx=(10, 0))
-        marco_botones = tk.Frame(marco_form, bg="white")
-        marco_botones.pack(fill="x", pady=20)
-        ttk.Button(
-            marco_botones,
-            text="Agregar Componente",
-            style="Custom.TButton",
-            command=self.agregar_producto,
-        ).pack(side="left", padx=5)
-        ttk.Button(
-            marco_botones,
-            text="Limpiar Campos",
-            style="Custom.TButton",
-            command=self.limpiar_campos,
-        ).pack(side="left", padx=5)
-
-    def crear_tabla(self, padre):
-        marco_tabla = tk.Frame(padre, bg="white", padx=30, pady=20)
-        marco_tabla.pack(side="right", fill="both", expand=True, padx=(10, 0))
-        marco_tabla.config(relief="ridge", bd=1)
-        marco_filtros = tk.Frame(marco_tabla, bg="white")
-        marco_filtros.pack(fill="x", pady=(0, 20))
-        tk.Label(
-            marco_filtros,
-            text="Filtrar por categoría:",
-            font=("Helvetica", 12),
-            bg="white",
-        ).pack(side="left", padx=(0, 10))
-        self.filtro_categoria = ttk.Combobox(
-            marco_filtros,
-            values=["Todas"] + list(self.categorias.keys()),
-            width=20,
-            state="readonly",
-        )
-        self.filtro_categoria.set("Todas")
-        self.filtro_categoria.pack(side="left", padx=(0, 20))
-        self.filtro_categoria.bind(
-            "<<ComboboxSelected>>", lambda e: self.filtrar_productos()
-        )
-        tk.Label(
-            marco_filtros, text="Buscar:", font=("Helvetica", 12), bg="white"
-        ).pack(side="left", padx=(0, 10))
-        self.entrada_buscar = ttk.Entry(marco_filtros, style="Custom.TEntry", width=40)
-        self.entrada_buscar.pack(side="left", padx=(0, 10))
-        ttk.Button(
-            marco_filtros,
-            text="Buscar",
-            style="Custom.TButton",
-            command=self.buscar_producto,
-        ).pack(side="left")
-        columnas = {
-            "ID": {"ancho": 50},
-            "Modelo": {"ancho": 100},
-            "Nombre": {"ancho": 200},
-            "Especificaciones": {"ancho": 200},
-            "Precio": {"ancho": 80},
-            "Cantidad": {"ancho": 80},
-            "Categoría": {"ancho": 150},
-        }
-        self.tabla = ttk.Treeview(
-            marco_tabla, columns=list(columnas.keys()), show="headings", height=20
-        )
-        for col, config in columnas.items():
-            self.tabla.heading(col, text=col)
-            self.tabla.column(col, width=config["ancho"], anchor="center")
-        self.tabla.pack(fill="both", expand=True, pady=10)
-        barra_desplazamiento = ttk.Scrollbar(
-            marco_tabla, orient="vertical", command=self.tabla.yview
-        )
-        barra_desplazamiento.pack(side="right", fill="y")
-        self.tabla.configure(yscrollcommand=barra_desplazamiento.set)
-        marco_acciones = tk.Frame(marco_tabla, bg="white")
-        marco_acciones.pack(fill="x", pady=10)
-        ttk.Button(
-            marco_acciones,
-            text="Eliminar Seleccionado",
-            style="Custom.TButton",
-            command=self.eliminar_producto,
-        ).pack(side="left", padx=5)
-        ttk.Button(
-            marco_acciones,
-            text="Actualizar Lista",
-            style="Custom.TButton",
-            command=self.actualizar_tabla,
-        ).pack(side="left", padx=5)
-
-    def validar_decimal(self, valor):
-        if valor == "":
-            return True
-        try:
-            float(valor)
-            return True
-        except ValueError:
-            return False
-
-    def validar_entero(self, valor):
-        if valor == "":
-            return True
-        return valor.isdigit()
-
-    def agregar_producto(self):
-        datos = {}
-        for nombre, config in self.entradas.items():
-            valor = config["widget"].get()
-            if not valor:
-                messagebox.showwarning(
-                    "Advertencia", f"El campo {nombre} no puede estar vacío."
+    def crear_db(self):
+        with conectar_db() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS productos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    modelo TEXT NOT NULL,
+                    nombre TEXT NOT NULL,
+                    especificaciones TEXT,
+                    precio REAL,
+                    cantidad INTEGER,
+                    categoria TEXT
                 )
-                return
-            try:
-                datos[nombre] = config["tipo"](valor)
-            except ValueError:
-                messagebox.showwarning(
-                    "Advertencia", f"El valor en {nombre} no es válido."
-                )
-                return
-        categoria = self.categoria_var.get()
-        if not categoria:
-            messagebox.showwarning("Advertencia", "Debe seleccionar una categoría.")
-            return
-        datos["categoria"] = categoria
-        consulta = "INSERT INTO productos (modelo, nombre, especificaciones, precio, cantidad, categoria) VALUES (?, ?, ?, ?, ?, ?)"
-        conectar_db(
-            consulta,
-            (
-                datos["Modelo"],
-                datos["Nombre"],
-                datos["Especificaciones"],
-                datos["Precio"],
-                datos["Cantidad"],
-                datos["categoria"],
-            ),
-        )
-        messagebox.showinfo("Éxito", "Producto agregado exitosamente.")
-        self.actualizar_tabla()
-        self.limpiar_campos()
-
-    def limpiar_campos(self):
-        for config in self.entradas.values():
-            config["widget"].delete(0, "end")
-        self.categoria_var.set("")
-
-    def eliminar_producto(self):
-        seleccion = self.tabla.selection()
-        if not seleccion:
-            messagebox.showwarning(
-                "Advertencia", "Seleccione un producto para eliminar."
+            """
             )
-            return
-        producto = self.tabla.item(seleccion)["values"]
-        consulta = "DELETE FROM productos WHERE id = ?"
-        conectar_db(consulta, (producto[0],))
-        messagebox.showinfo("Éxito", "Producto eliminado.")
+
+    def crear_interfaz(self):
+        self.frame_principal = tk.Frame(self.ventana, bg=COLORES["frame_principal"])
+        self.frame_principal.pack(padx=20, pady=20, fill="both", expand=True)
+
+        tk.Label(
+            self.frame_principal,
+            text="Electrónica Mr.CrossFit - Sistema de Inventario",
+            font=("Helvetica", 24, "bold"),
+            bg=COLORES["frame_principal"],
+            fg=COLORES["texto"],
+        ).pack(pady=20)
+
+        container = tk.Frame(self.frame_principal, bg=COLORES["frame_principal"])
+        container.pack(fill="both", expand=True)
+
+        self.crear_formulario(container)
+        self.crear_tabla(container)
+
+    def crear_formulario(self, container):
+        form_frame = tk.LabelFrame(
+            container,
+            text="Agregar Nuevo Producto",
+            font=("Helvetica", 12, "bold"),
+            bg=COLORES["frame_principal"],
+            fg=COLORES["texto"],
+        )
+        form_frame.pack(side="left", padx=10, pady=5, fill="both", expand=True)
+
+        self.entradas = {}
+        for campo, config in CAMPOS.items():
+            frame = tk.Frame(form_frame, bg=COLORES["frame_principal"])
+            frame.pack(fill="x", padx=5, pady=5)
+
+            tk.Label(
+                frame,
+                text=f"{config['label']}:",
+                font=("Helvetica", 11),
+                bg=COLORES["frame_principal"],
+            ).pack(side="left")
+
+            entrada = ttk.Entry(frame)
+            entrada.pack(side="left", padx=5, fill="x", expand=True)
+            self.entradas[campo] = entrada
+
+        frame = tk.Frame(form_frame, bg=COLORES["frame_principal"])
+        frame.pack(fill="x", padx=5, pady=5)
+
+        tk.Label(
+            frame,
+            text="Categoría:",
+            font=("Helvetica", 11),
+            bg=COLORES["frame_principal"],
+        ).pack(side="left")
+
+        self.categoria_var = ttk.Combobox(
+            frame, values=list(CATEGORIAS.values()), state="readonly"
+        )
+        self.categoria_var.pack(side="left", padx=5, fill="x", expand=True)
+
+        frame_botones = tk.Frame(form_frame, bg=COLORES["frame_principal"])
+        frame_botones.pack(fill="x", padx=5, pady=15)
+
+        ttk.Button(frame_botones, text="Guardar", command=self.guardar_producto).pack(
+            side="left", padx=5
+        )
+        ttk.Button(frame_botones, text="Limpiar", command=self.limpiar_campos).pack(
+            side="left", padx=5
+        )
+
+    def crear_tabla(self, container):
+        tabla_frame = tk.LabelFrame(
+            container,
+            text="Inventario",
+            font=("Helvetica", 12, "bold"),
+            bg=COLORES["frame_principal"],
+            fg=COLORES["texto"],
+        )
+        tabla_frame.pack(side="right", padx=10, pady=5, fill="both", expand=True)
+
+        busqueda_frame = tk.Frame(tabla_frame, bg=COLORES["frame_principal"])
+        busqueda_frame.pack(fill="x", padx=5, pady=5)
+
+        tk.Label(
+            busqueda_frame, text="Filtrar por:", bg=COLORES["frame_principal"]
+        ).pack(side="left", padx=(0, 5))
+
+        self.filtro_cat = ttk.Combobox(
+            busqueda_frame,
+            values=["Todas"] + list(CATEGORIAS.values()),
+            state="readonly",
+            width=30,
+        )
+        self.filtro_cat.set("Todas")
+        self.filtro_cat.pack(side="left", padx=5)
+        self.filtro_cat.bind("<<ComboboxSelected>>", lambda e: self.actualizar_tabla())
+
+        tk.Label(busqueda_frame, text="Buscar:", bg=COLORES["frame_principal"]).pack(
+            side="left", padx=(20, 5)
+        )
+
+        self.busqueda_entrada = ttk.Entry(busqueda_frame, width=30)
+        self.busqueda_entrada.pack(side="left", padx=5)
+
+        ttk.Button(
+            busqueda_frame, text="🔍 Buscar", command=self.actualizar_tabla
+        ).pack(side="left", padx=5)
+
+        columnas = (
+            "ID",
+            "Modelo",
+            "Nombre",
+            "Especificaciones",
+            "Precio",
+            "Cantidad",
+            "Categoría",
+        )
+        self.tabla = ttk.Treeview(tabla_frame, columns=columnas, show="headings")
+        for col in columnas:
+            self.tabla.heading(col, text=col)
+            self.tabla.column(col, width=100)
+
+        self.tabla.pack(fill="both", expand=True, padx=5, pady=5)
+        scrollbar = ttk.Scrollbar(
+            tabla_frame, orient="vertical", command=self.tabla.yview
+        )
+        scrollbar.pack(side="right", fill="y")
+        self.tabla.configure(yscrollcommand=scrollbar.set)
+        ttk.Button(
+            tabla_frame, text="Eliminar Seleccionado", command=self.eliminar_producto
+        ).pack(pady=5)
         self.actualizar_tabla()
-
-    def filtrar_productos(self):
-        categoria = self.filtro_categoria.get()
-        texto_busqueda = self.entrada_buscar.get()
-        for item in self.tabla.get_children():
-            self.tabla.delete(item)
-        conexion = sqlite3.connect("inventario_componentes.db")
-        cursor = conexion.cursor()
-        if categoria == "Todas":
-            if texto_busqueda:
-                cursor.execute(
-                    "SELECT * FROM productos WHERE nombre LIKE ?",
-                    ("%" + texto_busqueda + "%",),
-                )
-            else:
-                cursor.execute("SELECT * FROM productos")
-        else:
-            if texto_busqueda:
-                cursor.execute(
-                    "SELECT * FROM productos WHERE categoria = ? AND nombre LIKE ?",
-                    (categoria, "%" + texto_busqueda + "%"),
-                )
-            else:
-                cursor.execute(
-                    "SELECT * FROM productos WHERE categoria = ?", (categoria,)
-                )
-        productos = cursor.fetchall()
-        conexion.close()
-        for producto in productos:
-            self.tabla.insert("", "end", values=producto)
-
-    def buscar_producto(self):
-        self.filtrar_productos()
 
     def actualizar_tabla(self):
         for item in self.tabla.get_children():
             self.tabla.delete(item)
-        conexion = sqlite3.connect("inventario_componentes.db")
-        cursor = conexion.cursor()
-        categoria = self.filtro_categoria.get()
-        if categoria == "Todas":
-            cursor.execute("SELECT * FROM productos")
+
+        categoria = self.filtro_cat.get()
+        termino_busqueda = self.busqueda_entrada.get().strip().lower()
+
+        with conectar_db() as conn:
+            if categoria == "Todas":
+                if termino_busqueda:
+                    productos = conn.execute(
+                        """
+                        SELECT * FROM productos 
+                        WHERE LOWER(nombre) LIKE ? OR LOWER(modelo) LIKE ?
+                    """,
+                        (f"%{termino_busqueda}%", f"%{termino_busqueda}%"),
+                    ).fetchall()
+                else:
+                    productos = conn.execute("SELECT * FROM productos").fetchall()
+            else:
+                if termino_busqueda:
+                    productos = conn.execute(
+                        """
+                        SELECT * FROM productos 
+                        WHERE categoria = ? 
+                        AND (LOWER(nombre) LIKE ? OR LOWER(modelo) LIKE ?)
+                    """,
+                        (categoria, f"%{termino_busqueda}%", f"%{termino_busqueda}%"),
+                    ).fetchall()
+                else:
+                    productos = conn.execute(
+                        "SELECT * FROM productos WHERE categoria = ?", (categoria,)
+                    ).fetchall()
+
+        if not productos:
+            self.tabla.insert(
+                "",
+                "end",
+                values=("No se encontraron productos", "", "", "", "", "", ""),
+            )
         else:
-            cursor.execute("SELECT * FROM productos WHERE categoria = ?", (categoria,))
-        productos = cursor.fetchall()
-        conexion.close()
-        for producto in productos:
-            self.tabla.insert("", "end", values=producto)
+            for producto in productos:
+                self.tabla.insert("", "end", values=producto)
+
+    def limpiar_campos(self):
+        for entrada in self.entradas.values():
+            entrada.delete(0, tk.END)
+        self.categoria_var.set("")
+
+    def guardar_producto(self):
+        datos = {campo: entrada.get() for campo, entrada in self.entradas.items()}
+        datos["categoria"] = self.categoria_var.get()
+
+        errores = []
+        for campo, config in CAMPOS.items():
+            if config["required"] and not datos[campo]:
+                errores.append(f"El campo {config['label']} es obligatorio.")
+            elif "validacion" in config and not config["validacion"](datos[campo]):
+                errores.append(f"El valor de {config['label']} no es válido.")
+
+        if errores:
+            messagebox.showerror("Error de Validación", "\n".join(errores))
+            return
+
+        with conectar_db() as conn:
+            conn.execute(
+                """
+                INSERT INTO productos (modelo, nombre, especificaciones, precio, cantidad, categoria)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    datos["modelo"],
+                    datos["nombre"],
+                    datos["especificaciones"],
+                    float(datos["precio"]),
+                    int(datos["cantidad"]),
+                    datos["categoria"],
+                ),
+            )
+
+        messagebox.showinfo(
+            "Producto Guardado", "El producto se ha guardado con éxito."
+        )
+        self.limpiar_campos()
+        self.actualizar_tabla()
+
+    def eliminar_producto(self):
+        seleccion = self.tabla.selection()
+        if not seleccion:
+            messagebox.showerror("Error", "Seleccione un producto para eliminar.")
+            return
+        id_producto = self.tabla.item(seleccion[0])["values"][0]
+
+        with conectar_db() as conn:
+            conn.execute("DELETE FROM productos WHERE id = ?", (id_producto,))
+        self.actualizar_tabla()
+        messagebox.showinfo(
+            "Producto Eliminado", "El producto se ha eliminado exitosamente."
+        )
 
 
-if __name__ == "__main__":
-    ventana = tk.Tk()
-    sistema = SistemaTienda(ventana)
-    ventana.mainloop()
+ventana = tk.Tk()
+app = SistemaTienda(ventana)
+ventana.mainloop()
