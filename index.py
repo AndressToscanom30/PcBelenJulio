@@ -52,6 +52,10 @@ CATEGORIAS = {
     "accesorios": "Accesorios",
 }
 
+USUARIOS = {
+    "cliente" : "cliente123",
+    "empleado" : "empleado123",
+}
 
 class SistemaTienda:
     def __init__(self, ventana):
@@ -59,13 +63,46 @@ class SistemaTienda:
         self.ventana.title("Electrónica Mr.CrossFit - Sistema de Gestión")
         self.ventana.configure(bg=COLORES["fondo"])
 
-        ancho, alto = 1200, 700
-        x = (ventana.winfo_screenwidth() - ancho) // 2
-        y = (ventana.winfo_screenheight() - alto) // 2
-        self.ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+        self.iniciar_sesion()
 
-        self.crear_db()
-        self.crear_interfaz()
+    def iniciar_sesion(self):
+        self.limpiar_ventana()
+        
+        frame_login = tk.Frame(self.ventana, bg=COLORES["fondo"])
+        frame_login.pack(padx=20, pady=20)
+
+        tk.Label(
+            frame_login,
+            text="Iniciar Sesión",
+            font=("Helvetica", 24, "bold"),
+            bg=COLORES["fondo"],
+            fg=COLORES["texto"],
+        ).pack(pady=20)
+
+        tk.Label(frame_login, text="Usuario:", bg=COLORES["fondo"]).pack(pady=5)
+        self.usuario_entry = ttk.Entry(frame_login)
+        self.usuario_entry.pack(pady=5)
+
+        tk.Label(frame_login, text="Contraseña:", bg=COLORES["fondo"]).pack(pady=5)
+        self.contrasena_entry = ttk.Entry(frame_login, show="*")
+        self.contrasena_entry.pack(pady=5)
+
+        ttk.Button(frame_login, text="Iniciar Sesión", command=self.validar_usuario).pack(pady=10)
+
+    def validar_usuario(self):
+        usuario = self.usuario_entry.get().strip()
+        contrasena = self.contrasena_entry.get().strip()
+
+        if usuario in USUARIOS and USUARIOS[usuario] == contrasena:
+            messagebox.showinfo("Éxito", f"Bienvenido {usuario}!")
+            self.crear_db()
+            self.crear_interfaz(usuario)
+        else:
+            messagebox.showerror("Error", "Usuario o contraseña incorrectos.")
+
+    def limpiar_ventana(self):
+        for widget in self.ventana.winfo_children():
+            widget.destroy()
 
     def crear_db(self):
         with conectar_db() as conn:
@@ -78,14 +115,17 @@ class SistemaTienda:
                     especificaciones TEXT,
                     precio REAL,
                     cantidad INTEGER,
-                    categoria TEXT
-                )
-            """
+                    categoria TEXT);
+                """
             )
 
-    def crear_interfaz(self):
+    def crear_interfaz(self, usuario):
+        self.limpiar_ventana()
+
         self.frame_principal = tk.Frame(self.ventana, bg=COLORES["frame_principal"])
         self.frame_principal.pack(padx=20, pady=20, fill="both", expand=True)
+
+        ttk.Button(self.frame_principal, text="Cerrar Sesión", command=self.cerrar_sesion).pack(pady=10)
 
         tk.Label(
             self.frame_principal,
@@ -100,6 +140,9 @@ class SistemaTienda:
 
         self.crear_formulario(container)
         self.crear_tabla(container)
+
+    def cerrar_sesion(self):
+        self.iniciar_sesion()
 
     def crear_formulario(self, container):
         form_frame = tk.LabelFrame(
@@ -125,7 +168,18 @@ class SistemaTienda:
 
             entrada = ttk.Entry(frame)
             entrada.pack(side="left", padx=5, fill="x", expand=True)
-            self.entradas[campo] = entrada
+            self.entradas[campo] = {"widget": entrada, "tipo": config["tipo"]}
+
+            if config["tipo"] in [int, float]:
+                entrada.config(validate="key")
+                if config["tipo"] is float:
+                    entrada.config(
+                        validatecommand=(container.register(self.validar_decimal), "%P")
+                    )
+                else:
+                    entrada.config(
+                        validatecommand=(container.register(self.validar_entero), "%P")
+                    )
 
         frame = tk.Frame(form_frame, bg=COLORES["frame_principal"])
         frame.pack(fill="x", padx=5, pady=5)
@@ -151,6 +205,20 @@ class SistemaTienda:
         ttk.Button(frame_botones, text="Limpiar", command=self.limpiar_campos).pack(
             side="left", padx=5
         )
+
+    def validar_decimal(self, valor):
+        if valor == "":
+            return True
+        try:
+            float(valor)
+            return True
+        except ValueError:
+            return False
+
+    def validar_entero(self, valor):
+        if valor == "":
+            return True
+        return valor.isdigit()
 
     def crear_tabla(self, container):
         tabla_frame = tk.LabelFrame(
@@ -261,11 +329,11 @@ class SistemaTienda:
 
     def limpiar_campos(self):
         for entrada in self.entradas.values():
-            entrada.delete(0, tk.END)
+            entrada["widget"].delete(0, tk.END)
         self.categoria_var.set("")
 
     def guardar_producto(self):
-        datos = {campo: entrada.get() for campo, entrada in self.entradas.items()}
+        datos = {campo: entrada["widget"].get() for campo, entrada in self.entradas.items()}
         datos["categoria"] = self.categoria_var.get()
 
         errores = []
@@ -303,17 +371,26 @@ class SistemaTienda:
 
     def eliminar_producto(self):
         seleccion = self.tabla.selection()
-        if not seleccion:
+        cantidad_seleccionados = len(seleccion)
+
+        if cantidad_seleccionados == 0:
             messagebox.showerror("Error", "Seleccione un producto para eliminar.")
             return
-        id_producto = self.tabla.item(seleccion[0])["values"][0]
+            
+        mensaje = f"¿Está seguro de que desea eliminar {cantidad_seleccionados} producto(s)?"
+        confirmacion = messagebox.askyesno("Confirmar Eliminación", mensaje)
 
-        with conectar_db() as conn:
-            conn.execute("DELETE FROM productos WHERE id = ?", (id_producto,))
-        self.actualizar_tabla()
-        messagebox.showinfo(
-            "Producto Eliminado", "El producto se ha eliminado exitosamente."
-        )
+        if confirmacion:
+            for item in seleccion:
+                id_producto = self.tabla.item(item)["values"][0]
+                with conectar_db() as conn:
+                    conn.execute("DELETE FROM productos WHERE id = ?", (id_producto,))
+            
+            self.actualizar_tabla()
+            messagebox.showinfo("Producto Eliminado", "Los productos se han eliminado exitosamente.")
+        else:
+            messagebox.showinfo("Eliminación Cancelada", "La eliminación ha sido cancelada.")
+
 
 
 ventana = tk.Tk()
