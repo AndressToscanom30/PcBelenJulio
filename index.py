@@ -13,8 +13,8 @@ por un pdf, para instalarla ejecute el siguiente comando:
 -pip install reportlab
 Si por algun caso genera error al ejecutar, comentar o eliminar el metoddo generar_factura_pdf
 y comentar o eliminar la linea 1001 a la 1007.
-
 """
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sqlite3
