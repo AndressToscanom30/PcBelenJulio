@@ -1,44 +1,81 @@
+"""
+PROGRAMA PARA LA GESTION DE UNA TIENDA DE PARTES ELECTRONICAS
+
+- Andres Sebastian Toscano Martinez - 02230131068
+- Keiver Esneid Castellanos Julio - 02230131035
+
+"""
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import sqlite3
 
-def conectar_db():
-    return sqlite3.connect("inventario_componentes.db")
+def validar_texto(char):
+    return char.isalpha() or char.isspace() or char == "-" or char.isdigit()
 
+def validar_numerico(char):
+    return char.isdigit()
+
+def validar_flotante(char):
+    return char.isdigit() or char == "." or char == ""
+
+def conectar_base_datos():
+    try:
+        return sqlite3.connect("inventario_componentes.db")
+    except sqlite3.Error as e:
+        messagebox.showerror("Error de Base de Datos", f"Error al conectar: {str(e)}")
+        return None
 
 COLORES = {
-    "fondo": "#FFFFFF",           # Pure white background
-    "frame_principal": "#F9F9F9", # Subtle off-white
-    "primario": "#2D3436",        # Rich charcoal
-    "secundario": "#636E72",      # Sophisticated gray
-    "acento": "#B8860B",         # Deep gold
-    "acento_claro": "#DAA520",   # Light gold
-    "texto": "#2D3436",          # Matching text color
-    "texto_suave": "#636E72",    # Soft text
-    "borde": "#DFE6E9",          # Subtle border
-    "error": "#B33939",          # Elegant red
-    "exito": "#218C74",          # Forest green
-    "hover": "#34495E",          # Hover state
-    "disabled": "#B2BEC3",       # Disabled state
-    "seleccion": "#F8F9FA",      # Selected state
-    "input_bg": "#FFFFFF",       # Input background
-    "sombra": "#00000010"        # Subtle shadow
+    "fondo": "#FFFFFF",          
+    "frame_principal": "#F9F9F9",
+    "primario": "#2D3436",        
+    "secundario": "#636E72",      
+    "acento": "#B8860B",        
+    "acento_claro": "#DAA520",  
+    "texto": "#2D3436",          
+    "texto_suave": "#636E72",    
+    "borde": "#DFE6E9",          
+    "error": "#B33939",          
+    "exito": "#218C74",          
+    "hover": "#34495E",          
+    "disabled": "#B2BEC3",      
+    "seleccion": "#F8F9FA",      
+    "input_bg": "#FFFFFF",      
+    "sombra": "#00000010"        
 }
 
 CAMPOS = {
-    "modelo": {"label": "Modelo", "tipo": str, "required": True},
-    "nombre": {"label": "Nombre", "tipo": str, "required": True},
-    "especificaciones": {"label": "Especificaciones", "tipo": str, "required": True},
+    "modelo": {
+        "label": "Modelo",
+        "tipo": str,
+        "required": True,
+        "validate": validar_texto
+    },
+    "nombre": {
+        "label": "Nombre",
+        "tipo": str,
+        "required": True,
+        "validate": validar_texto
+    },
+    "especificaciones": {
+        "label": "Especificaciones",
+        "tipo": str,
+        "required": True,
+        "validate": validar_texto
+    },
     "precio": {
         "label": "Precio",
         "tipo": float,
         "required": True,
+        "validate": validar_flotante,
         "validacion": lambda x: x.replace(".", "", 1).isdigit() if x else False,
     },
     "cantidad": {
         "label": "Cantidad",
         "tipo": int,
         "required": True,
+        "validate": validar_numerico,
         "validacion": lambda x: x.isdigit() if x else False,
     },
 }
@@ -58,12 +95,12 @@ USUARIOS = {
     "empleado": "empleado123",
 }
 
-
 class SistemaTienda:
     def __init__(self, ventana):
         self.ventana = ventana
         self.ventana.title("Electrónica Mr.CrossFit - Sistema de Gestión")
         self.ventana.configure(bg=COLORES["fondo"])
+        self.rol_usuario = None
         window_width = 1200
         window_height = 700
         screen_width = self.ventana.winfo_screenwidth()
@@ -176,8 +213,9 @@ class SistemaTienda:
         contrasena = self.contrasena_entry.get().strip()
 
         if usuario in USUARIOS and USUARIOS[usuario] == contrasena:
+            self.rol_usuario = usuario
             messagebox.showinfo("Éxito", f"Bienvenido {usuario}!")
-            self.crear_db()
+            self.crear_base_datos()
             self.crear_interfaz(usuario)
         else:
             messagebox.showerror("Error", "Usuario o contraseña incorrectos.")
@@ -186,8 +224,8 @@ class SistemaTienda:
         for widget in self.ventana.winfo_children():
             widget.destroy()
 
-    def crear_db(self):
-        with conectar_db() as conn:
+    def crear_base_datos(self):
+        with conectar_base_datos() as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS productos (
@@ -269,7 +307,7 @@ class SistemaTienda:
         table_container.pack(side="right", fill="both", expand=True)
         
         self.crear_tabla(table_container)
-        self.tabla.bind("<<TreeviewSelect>>", self.seleccion_tabla)
+        self.tabla.bind("<<TreeviewSelect>>", self.seleccionar_elemento_tabla)
         
         style = ttk.Style()
         style.configure("Treeview",
@@ -286,10 +324,9 @@ class SistemaTienda:
             font=("Helvetica", 11, "bold")
         )
         style.map("Treeview.Heading",
-            background=[('active', COLORES["borde"])], 
+            background=[('active', COLORES["borde"])],
             foreground=[('active', COLORES["primario"])]
         )
-
 
     def crear_formulario_edicion(self, container):
         edit_frame = tk.LabelFrame(
@@ -300,6 +337,7 @@ class SistemaTienda:
             fg=COLORES["texto"],
         )
         edit_frame.pack(side="top", padx=10, pady=5, fill="both")
+        
         self.entradas_edicion = {}
         for campo, config in CAMPOS.items():
             frame = tk.Frame(edit_frame, bg=COLORES["frame_principal"])
@@ -335,36 +373,46 @@ class SistemaTienda:
         frame_botones = tk.Frame(edit_frame, bg=COLORES["frame_principal"])
         frame_botones.pack(fill="x", padx=5, pady=15)
 
-        self.actualizar_btn = ttk.Button(frame_botones, text="Actualizar", 
-                                       command=self.actualizar_producto, state='disabled')
+        self.actualizar_btn = ttk.Button(
+            frame_botones,
+            text="Actualizar",
+            command=self.actualizar_producto,
+            state='disabled'
+        )
         self.actualizar_btn.pack(side="left", padx=5)
         
-        self.cancelar_btn = ttk.Button(frame_botones, text="Cancelar", 
-                                     command=self.cancelar_edicion, state='disabled')
+        self.cancelar_btn = ttk.Button(
+            frame_botones,
+            text="Cancelar",
+            command=self.cancelar_edicion,
+            state='disabled'
+        )
         self.cancelar_btn.pack(side="left", padx=5)
 
-    def seleccion_tabla(self, event):
-        seleccion = self.tabla.selection()
-        if seleccion:
-            self.habilitar_form_edicion()
-        else:
-            self.deshabilitar_form_edicion()
+    def seleccionar_elemento_tabla(self, event):
+        if self.rol_usuario == "empleado":
+            seleccion = self.tabla.selection()
+            if seleccion:
+                self.habilitar_formulario_edicion()
+            else:
+                self.deshabilitar_formulario_edicion()
 
-    def habilitar_form_edicion(self):
+
+    def habilitar_formulario_edicion(self):
         for campo in self.entradas_edicion:
             self.entradas_edicion[campo]["widget"].configure(state='normal')
         self.categoria_edit_var.configure(state='readonly')
         self.actualizar_btn.configure(state='normal')
         self.cancelar_btn.configure(state='normal')
 
-    def deshabilitar_form_edicion(self):
+    def deshabilitar_formulario_edicion(self):
         for campo in self.entradas_edicion:
             self.entradas_edicion[campo]["widget"].configure(state='disabled')
         self.categoria_edit_var.configure(state='disabled')
         self.actualizar_btn.configure(state='disabled')
         self.cancelar_btn.configure(state='disabled')
 
-    def cargar_producto_para_editar(self):
+    def cargar_producto_edicion(self):
         seleccion = self.tabla.selection()
         if not seleccion:
             messagebox.showwarning("Advertencia", "Por favor seleccione un producto para editar")
@@ -392,15 +440,15 @@ class SistemaTienda:
         datos["categoria"] = self.categoria_edit_var.get()
 
         if self.validar_datos(datos):
-            with conectar_db() as conn:
+            with conectar_base_datos() as conn:
                 conn.execute(
                     """
-                    UPDATE productos 
+                    UPDATE productos
                     SET modelo=?, nombre=?, especificaciones=?, precio=?, cantidad=?, categoria=?
                     WHERE id=?
                     """,
-                    (datos["modelo"], datos["nombre"], datos["especificaciones"], 
-                     float(datos["precio"]), int(datos["cantidad"]), 
+                    (datos["modelo"], datos["nombre"], datos["especificaciones"],
+                     float(datos["precio"]), int(datos["cantidad"]),
                      datos["categoria"], self.id_producto_actual)
                 )
             messagebox.showinfo("Éxito", "Producto actualizado exitosamente.")
@@ -410,6 +458,10 @@ class SistemaTienda:
             messagebox.showerror("Error", "Por favor, complete todos los campos correctamente.")
 
     def eliminar_producto(self):
+        if self.rol_usuario != "empleado":
+            messagebox.showwarning("Acceso Denegado", "No tiene permisos para eliminar productos")
+            return
+            
         seleccion = self.tabla.selection()
         if not seleccion:
             messagebox.showwarning("Advertencia", "Por favor seleccione un producto para eliminar")
@@ -419,7 +471,7 @@ class SistemaTienda:
             item = self.tabla.item(seleccion[0])
             id_producto = item['values'][0]
             
-            with conectar_db() as conn:
+            with conectar_base_datos() as conn:
                 conn.execute("DELETE FROM productos WHERE id=?", (id_producto,))
             
             self.actualizar_tabla()
@@ -431,7 +483,7 @@ class SistemaTienda:
         self.categoria_edit_var.set("")
         if hasattr(self, 'id_producto_actual'):
             del self.id_producto_actual
-        self.deshabilitar_form_edicion()
+        self.deshabilitar_formulario_edicion()
 
     def cerrar_sesion(self):
         self.iniciar_sesion()
@@ -458,7 +510,8 @@ class SistemaTienda:
                 bg=COLORES["frame_principal"],
             ).pack(side="left")
 
-            entrada = ttk.Entry(frame)
+            vcmd = (self.ventana.register(config['validate']), '%S')
+            entrada = ttk.Entry(frame, validate='key', validatecommand=vcmd)
             entrada.pack(side="left", padx=5, fill="x", expand=True)
             self.entradas[campo] = {"widget": entrada, "tipo": config["tipo"]}
 
@@ -487,7 +540,6 @@ class SistemaTienda:
             side="left", padx=5
         )
 
-
     def crear_tabla(self, container):
         tabla_frame = tk.LabelFrame(
             container,
@@ -497,7 +549,6 @@ class SistemaTienda:
             fg=COLORES["texto"],
         )
         tabla_frame.pack(side="right", padx=10, pady=5, fill="both", expand=True)
-
         busqueda_frame = tk.Frame(tabla_frame, bg=COLORES["frame_principal"])
         busqueda_frame.pack(fill="x", padx=5, pady=5)
 
@@ -523,8 +574,11 @@ class SistemaTienda:
         botones_frame = tk.Frame(tabla_frame, bg=COLORES["frame_principal"])
         botones_frame.pack(fill="x", padx=5, pady=5)
         
-        ttk.Button(botones_frame, text="Cargar para editar", command=self.cargar_producto_para_editar).pack(side="left", padx=5)
-        ttk.Button(botones_frame, text="Eliminar", command=self.eliminar_producto).pack(side="left", padx=5)
+        if self.rol_usuario == "empleado":
+            ttk.Button(botones_frame, text="Cargar para editar", 
+                      command=self.cargar_producto_edicion).pack(side="left", padx=5)
+            ttk.Button(botones_frame, text="Eliminar", 
+                      command=self.eliminar_producto).pack(side="left", padx=5)
 
         self.tabla = ttk.Treeview(
             tabla_frame,
@@ -559,13 +613,13 @@ class SistemaTienda:
         datos["categoria"] = self.categoria_var.get()
 
         if self.validar_datos(datos):
-            with conectar_db() as conn:
+            with conectar_base_datos() as conn:
                 conn.execute(
                     """
                     INSERT INTO productos (modelo, nombre, especificaciones, precio, cantidad, categoria)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    (datos["modelo"], datos["nombre"], datos["especificaciones"], 
+                    (datos["modelo"], datos["nombre"], datos["especificaciones"],
                      float(datos["precio"]), int(datos["cantidad"]), datos["categoria"])
                 )
             messagebox.showinfo("Éxito", "Producto agregado exitosamente.")
@@ -591,9 +645,10 @@ class SistemaTienda:
         for item in self.tabla.get_children():
             self.tabla.delete(item)
 
-        with conectar_db() as conn:
+        with conectar_base_datos() as conn:
             query = "SELECT * FROM productos"
             filtros = []
+
             if self.filtro_cat.get() != "Todas":
                 query += " WHERE categoria = ?"
                 filtros.append(self.filtro_cat.get())
