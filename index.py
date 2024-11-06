@@ -742,6 +742,14 @@ class SistemaTienda:
         self.tabla.column("Cantidad", width=80)
         self.tabla.column("Categoría", width=180)
 
+        # Agregar encabezados
+        self.tabla.heading("ID", text="ID")
+        self.tabla.heading("Modelo", text="Modelo")
+        self.tabla.heading("Nombre", text="Nombre")
+        self.tabla.heading("Especificaciones", text="Especificaciones")
+        self.tabla.heading("Precio", text="Precio")
+        self.tabla.heading("Cantidad", text="Cantidad")
+
         busqueda_frame = tk.Frame(tabla_frame, bg=COLORES["frame_principal"])
         busqueda_frame.pack(fill="x", padx=5, pady=5)
 
